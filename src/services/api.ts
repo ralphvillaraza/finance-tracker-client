@@ -12,7 +12,7 @@ import {
   ResetPasswordPayload,
 } from '../types';
 
-const API_BASE = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api`;
+const API_BASE = `${import.meta.env.VITE_API_URL || 'https://finance-tracker-server-2ld4.onrender.com'}/api`;
 const AUTH_STORAGE_KEY = 'finance-tracker-auth';
 
 function getStoredSession(): AuthSession | null {
