@@ -26,6 +26,7 @@ export function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
+  const [isBackendReady, setIsBackendReady] = useState(false);
 
   const [summary, setSummary] = useState<SummaryData>({
     totalBalance: 0,
@@ -47,6 +48,45 @@ export function App() {
 
     localStorage.setItem('finance-tracker-auth', JSON.stringify(session));
   }, [session]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const backendUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+
+    if (!backendUrl) {
+      return;
+    }
+
+    const pollHealth = async () => {
+      try {
+        const response = await fetch(`${backendUrl}/api/health`, {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        const text = await response.text();
+
+        if (!isMounted) return;
+
+        if (response.status === 200 && text.trim() === 'OK') {
+          setIsBackendReady(true);
+          return;
+        }
+      } catch {
+        // Backend is still waking up; retry in 3 seconds.
+      }
+
+      if (isMounted) {
+        setTimeout(pollHealth, 3000);
+      }
+    };
+
+    pollHealth();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!isLoadingData) {
@@ -116,6 +156,21 @@ export function App() {
     clearAuthSession();
     setSession(null);
   };
+
+  if (!isBackendReady) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 text-white">
+        <div className="flex flex-col items-center justify-center gap-4">
+          <div className="h-14 w-14 animate-spin rounded-full border-4 border-slate-700 border-t-blue-500" />
+          <div className="text-center">
+            <p className="text-xl font-semibold">Secure database is waking up...</p>
+            <p className="mt-2 text-sm text-slate-300">Please wait while the backend boots.</p>
+            <p className="mt-1 text-xs text-slate-400">Expect a 30-second delay.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!session) {
     return (
