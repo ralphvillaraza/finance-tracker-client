@@ -110,6 +110,26 @@ export function App() {
     };
   }, [isLoadingData]);
 
+  const renderLoadingCard = (title: string, subtitle: string) => (
+    <div
+      className={`min-h-screen flex items-center justify-center px-6 transition-colors duration-200 ${
+        isDarkMode ? 'bg-[#121114] text-[#f5f5f4]' : 'bg-white text-slate-900'
+      }`}
+    >
+      <div
+        className={`w-full max-w-md rounded-2xl border p-8 text-center shadow-soft ${
+          isDarkMode ? 'border-white/[0.08] bg-[#1a181c]' : 'border-slate-200 bg-slate-50'
+        }`}
+      >
+        <div className="mb-4 flex justify-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+        </div>
+        <h2 className="text-xl font-semibold">{title}</h2>
+        <p className="mt-2 text-sm text-slate-500 dark:text-stone-400">{subtitle}</p>
+      </div>
+    </div>
+  );
+
   const loadData = useCallback(async () => {
     if (!session) return;
 
@@ -158,17 +178,9 @@ export function App() {
   };
 
   if (!isBackendReady) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950 text-white">
-        <div className="flex flex-col items-center justify-center gap-4">
-          <div className="h-14 w-14 animate-spin rounded-full border-4 border-slate-700 border-t-blue-500" />
-          <div className="text-center">
-            <p className="text-xl font-semibold">Secure database is waking up...</p>
-            <p className="mt-2 text-sm text-slate-300">Please wait while the backend boots.</p>
-            <p className="mt-1 text-xs text-slate-400">Expect a 30-second delay.</p>
-          </div>
-        </div>
-      </div>
+    return renderLoadingCard(
+      'Secure database is waking up...',
+      'Please wait while the backend boots. Expect a 30-second delay.'
     );
   }
 
@@ -187,30 +199,11 @@ export function App() {
   }
 
   if (isLoadingData) {
-    return (
-      <div
-        className={`min-h-screen flex items-center justify-center px-6 transition-colors duration-200 ${
-          isDarkMode
-            ? 'bg-[#121114] text-[#f5f5f4]'
-            : 'bg-white text-slate-900'
-        }`}
-      >
-        <div
-          className={`w-full max-w-md rounded-2xl border p-8 text-center shadow-soft ${
-            isDarkMode ? 'border-white/[0.08] bg-[#1a181c]' : 'border-slate-200 bg-slate-50'
-          }`}
-        >
-          <div className="mb-4 flex justify-center">
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-          </div>
-          <h2 className="text-xl font-semibold">Waking up database server...</h2>
-          <p className="mt-2 text-sm text-slate-500 dark:text-stone-400">
-            {isWakeupMessageVisible
-              ? 'This might take 30-50 seconds. Please wait while the backend starts up.'
-              : 'Connecting to your finance data...'}
-          </p>
-        </div>
-      </div>
+    return renderLoadingCard(
+      'Waking up database server...',
+      isWakeupMessageVisible
+        ? 'This might take 30-50 seconds. Please wait while the backend starts up.'
+        : 'Connecting to your finance data...'
     );
   }
 
