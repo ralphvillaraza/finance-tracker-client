@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { OverviewMetrics } from './components/dashboard/OverviewMetrics';
 import { TransactionList } from './components/dashboard/TransactionList';
@@ -37,8 +37,6 @@ export function App() {
   const [cashFlow, setCashFlow] = useState<CashFlowPoint[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
-  const [isWakeupMessageVisible, setIsWakeupMessageVisible] = useState(false);
-  const wakeupTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!session) {
@@ -57,7 +55,7 @@ export function App() {
       return;
     }
 
-    const pollHealth = async () => {
+    const wakeBackendOnce = async () => {
       try {
         const response = await fetch(`${backendUrl}/api/health`, {
           method: 'GET',
@@ -70,45 +68,19 @@ export function App() {
 
         if (response.status === 200 && text.trim() === 'OK') {
           setIsBackendReady(true);
-          return;
         }
       } catch {
-        // Backend is still waking up; retry in 3 seconds.
-      }
-
-      if (isMounted) {
-        setTimeout(pollHealth, 3000);
+        // Let the loader stay visible if the server is still starting.
+        // We intentionally avoid repeated pinging after the first wake-up request.
       }
     };
 
-    pollHealth();
+    wakeBackendOnce();
 
     return () => {
       isMounted = false;
     };
   }, []);
-
-  useEffect(() => {
-    if (!isLoadingData) {
-      if (wakeupTimerRef.current) {
-        window.clearTimeout(wakeupTimerRef.current);
-        wakeupTimerRef.current = null;
-      }
-      setIsWakeupMessageVisible(false);
-      return;
-    }
-
-    wakeupTimerRef.current = window.setTimeout(() => {
-      setIsWakeupMessageVisible(true);
-    }, 5000);
-
-    return () => {
-      if (wakeupTimerRef.current) {
-        window.clearTimeout(wakeupTimerRef.current);
-        wakeupTimerRef.current = null;
-      }
-    };
-  }, [isLoadingData]);
 
   const renderLoadingCard = (title: string, subtitle: string) => (
     <div
@@ -201,9 +173,7 @@ export function App() {
   if (isLoadingData) {
     return renderLoadingCard(
       'Waking up database server...',
-      isWakeupMessageVisible
-        ? 'This might take 30-50 seconds. Please wait while the backend starts up.'
-        : 'Connecting to your finance data...'
+      'Connecting to your finance data...'
     );
   }
 
