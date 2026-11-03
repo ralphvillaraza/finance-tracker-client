@@ -14,6 +14,7 @@ import {
 
 const API_BASE = `${import.meta.env.VITE_API_URL || 'https://finance-tracker-server-2ld4.onrender.com'}/api`;
 const AUTH_STORAGE_KEY = 'finance-tracker-auth';
+const ENABLE_FALLBACK_DATA = import.meta.env.DEV && import.meta.env.VITE_ENABLE_FALLBACK !== 'false';
 
 function getStoredSession(): AuthSession | null {
   try {
@@ -204,6 +205,10 @@ export async function fetchSummary(): Promise<SummaryData> {
     const json = await res.json();
     return json.data;
   } catch (err) {
+    if (!ENABLE_FALLBACK_DATA) {
+      throw err instanceof Error ? err : new Error('Failed to load summary');
+    }
+
     console.warn('Utilizing fallback summary data:', err);
     return FALLBACK_SUMMARY;
   }
@@ -218,6 +223,10 @@ export async function fetchCashFlow(): Promise<CashFlowPoint[]> {
     const json = await res.json();
     return json.data;
   } catch (err) {
+    if (!ENABLE_FALLBACK_DATA) {
+      throw err instanceof Error ? err : new Error('Failed to load cash flow');
+    }
+
     console.warn('Utilizing fallback cash flow data:', err);
     return FALLBACK_CASH_FLOW;
   }
@@ -237,6 +246,10 @@ export async function fetchTransactions(filters?: Partial<FilterState>): Promise
     const json = await res.json();
     return json.data;
   } catch (err) {
+    if (!ENABLE_FALLBACK_DATA) {
+      throw err instanceof Error ? err : new Error('Failed to load transactions');
+    }
+
     console.warn('Utilizing fallback transactions data:', err);
     return FALLBACK_TRANSACTIONS;
   }
