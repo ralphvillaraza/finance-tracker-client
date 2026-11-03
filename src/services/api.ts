@@ -12,7 +12,9 @@ import {
   ResetPasswordPayload,
 } from '../types';
 
-const API_BASE = `${import.meta.env.VITE_API_URL || 'https://finance-tracker-server-2ld4.onrender.com'}/api`;
+const API_BASE = `${(
+  import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:5000' : 'https://finance-tracker-server-2ld4.onrender.com')
+).replace(/\/$/, '')}/api`;
 const AUTH_STORAGE_KEY = 'finance-tracker-auth';
 const ENABLE_FALLBACK_DATA = import.meta.env.DEV && import.meta.env.VITE_ENABLE_FALLBACK !== 'false';
 
@@ -39,39 +41,49 @@ export function clearAuthSession(): void {
 }
 
 export async function login(payload: LoginPayload): Promise<{ token: string; user: AuthSession['user'] }> {
-  const res = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.error || 'Login failed');
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || 'Login failed');
+    }
+
+    const session: AuthSession = {
+      token: json.data.token,
+      user: json.data.user,
+    };
+
+    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
+    return session;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Login failed';
+    throw new Error(message.includes('Failed to fetch') ? 'Unable to reach the backend. Check VITE_API_URL and the Render backend URL.' : message);
   }
-
-  const session: AuthSession = {
-    token: json.data.token,
-    user: json.data.user,
-  };
-
-  localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
-  return session;
 }
 
 export async function signup(payload: SignupPayload): Promise<{ message: string; devVerificationCode?: string }> {
-  const res = await fetch(`${API_BASE}/auth/signup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
+  try {
+    const res = await fetch(`${API_BASE}/auth/signup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
 
-  const json = await res.json();
-  if (!res.ok) {
-    throw new Error(json.error || 'Sign up failed');
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json.error || 'Sign up failed');
+    }
+
+    return json;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Sign up failed';
+    throw new Error(message.includes('Failed to fetch') ? 'Unable to reach the backend. Check VITE_API_URL and the Render backend URL.' : message);
   }
-
-  return json;
 }
 
 export async function verifySignup(payload: VerifySignupPayload): Promise<{ message: string }> {
