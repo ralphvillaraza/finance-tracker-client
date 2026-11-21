@@ -1,11 +1,12 @@
-import { FormEvent, useState } from 'react';
-import { ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, User, KeyRound } from 'lucide-react';
+import { FormEvent, useState, useEffect } from 'react';
+import { ArrowRight, CheckCircle2, Lock, Mail, ShieldCheck, User, KeyRound, RefreshCw } from 'lucide-react';
 import {
   forgotPassword,
   login,
   resetPassword,
   signup,
   verifySignup,
+  resendVerification,
 } from '../../services/api';
 import type { AuthSession } from '../../types';
 
@@ -32,6 +33,16 @@ export function AuthScreen({ isDarkMode, onAuthSuccess }: AuthScreenProps) {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const onChange = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -75,6 +86,7 @@ export function AuthScreen({ isDarkMode, onAuthSuccess }: AuthScreenProps) {
 
       setPendingEmail(form.email.trim());
       setMode('verify');
+      setResendCooldown(60);
       setMessage(result.message || 'Account created. Verify your email to continue.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign up failed');
@@ -100,6 +112,28 @@ export function AuthScreen({ isDarkMode, onAuthSuccess }: AuthScreenProps) {
       setError(err instanceof Error ? err.message : 'Verification failed');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    const targetEmail = (pendingEmail || form.email).trim();
+    if (!targetEmail) {
+      setError('Please enter your email to resend the code.');
+      return;
+    }
+    if (resendCooldown > 0 || isResending) return;
+
+    resetFeedback();
+    setIsResending(true);
+
+    try {
+      const result = await resendVerification({ email: targetEmail });
+      setMessage(result.message || 'A new verification code has been sent to your email.');
+      setResendCooldown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to resend code');
+    } finally {
+      setIsResending(false);
     }
   };
 
@@ -233,20 +267,43 @@ export function AuthScreen({ isDarkMode, onAuthSuccess }: AuthScreenProps) {
             </div>
           </label>
 
-          <label className="block space-y-2 text-sm">
-            <span className={mutedText}>{mode === 'verify' ? 'Verification code' : 'Reset code'}</span>
-            <div className="relative">
-              <KeyRound className={`absolute left-3 top-3.5 h-4 w-4 ${mutedText}`} />
-              <input
-                value={form.code}
-                onChange={(e) => onChange('code', e.target.value)}
-                className={`${baseInput} ${inputTheme} pl-10`}
-                inputMode="numeric"
-                maxLength={6}
-                placeholder="123456"
-              />
-            </div>
-          </label>
+          <div className="space-y-2 text-sm">
+            <label className="block space-y-2">
+              <span className={mutedText}>{mode === 'verify' ? 'Verification code' : 'Reset code'}</span>
+              <div className="relative">
+                <KeyRound className={`absolute left-3 top-3.5 h-4 w-4 ${mutedText}`} />
+                <input
+                  value={form.code}
+                  onChange={(e) => onChange('code', e.target.value)}
+                  className={`${baseInput} ${inputTheme} pl-10`}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="123456"
+                />
+              </div>
+            </label>
+
+            {mode === 'verify' ? (
+              <div className="flex items-center justify-between px-1 text-xs">
+                <span className={mutedText}>Didn't receive the code?</span>
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={resendCooldown > 0 || isResending}
+                  className="inline-flex items-center gap-1 font-semibold text-blue-600 transition hover:text-blue-500 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  <RefreshCw className={`h-3 w-3 ${isResending ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isResending
+                      ? 'Sending...'
+                      : resendCooldown > 0
+                        ? `Resend in ${resendCooldown}s`
+                        : 'Resend code'}
+                  </span>
+                </button>
+              </div>
+            ) : null}
+          </div>
 
           {mode === 'reset' ? (
             <>
@@ -398,20 +455,52 @@ export function AuthScreen({ isDarkMode, onAuthSuccess }: AuthScreenProps) {
         </form>
 
         <div className={`mt-6 flex flex-wrap items-center justify-between gap-2 text-sm ${mutedText}`}>
-          {mode !== 'signup' ? (
-            <button type="button" className="font-medium text-blue-600" onClick={() => { setMode('signup'); resetFeedback(); }}>
+          {mode === 'verify' ? (
+            <button
+              type="button"
+              className="font-medium text-blue-600 hover:text-blue-500"
+              onClick={() => {
+                setMode('signup');
+                resetFeedback();
+              }}
+            >
+              Wrong email? Sign up again
+            </button>
+          ) : mode !== 'signup' ? (
+            <button
+              type="button"
+              className="font-medium text-blue-600 hover:text-blue-500"
+              onClick={() => {
+                setMode('signup');
+                resetFeedback();
+              }}
+            >
               Create account
             </button>
           ) : null}
 
           {mode !== 'login' ? (
-            <button type="button" className="font-medium text-blue-600" onClick={() => { setMode('login'); resetFeedback(); }}>
+            <button
+              type="button"
+              className="font-medium text-blue-600 hover:text-blue-500"
+              onClick={() => {
+                setMode('login');
+                resetFeedback();
+              }}
+            >
               Back to login
             </button>
           ) : null}
 
           {mode === 'login' ? (
-            <button type="button" className="font-medium text-blue-600" onClick={() => { setMode('forgot'); resetFeedback(); }}>
+            <button
+              type="button"
+              className="font-medium text-blue-600 hover:text-blue-500"
+              onClick={() => {
+                setMode('forgot');
+                resetFeedback();
+              }}
+            >
               Forgot password?
             </button>
           ) : null}

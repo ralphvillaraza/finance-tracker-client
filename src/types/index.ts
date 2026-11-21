@@ -70,6 +70,10 @@ export interface VerifySignupPayload {
   code: string;
 }
 
+export interface ResendVerificationPayload {
+  email: string;
+}
+
 export interface ForgotPasswordPayload {
   email: string;
 }

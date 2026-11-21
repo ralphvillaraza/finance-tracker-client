@@ -8,6 +8,7 @@ import {
   LoginPayload,
   SignupPayload,
   VerifySignupPayload,
+  ResendVerificationPayload,
   ForgotPasswordPayload,
   ResetPasswordPayload,
 } from '../types';
@@ -96,6 +97,21 @@ export async function verifySignup(payload: VerifySignupPayload): Promise<{ mess
   const json = await res.json();
   if (!res.ok) {
     throw new Error(json.error || 'Verification failed');
+  }
+
+  return json;
+}
+
+export async function resendVerification(payload: ResendVerificationPayload): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/auth/resend-verification`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || 'Failed to resend verification code');
   }
 
   return json;
@@ -297,4 +313,3 @@ export async function deleteTransaction(id: number): Promise<void> {
     throw new Error(errData.error || 'Failed to delete transaction');
   }
 }
-
