@@ -26,7 +26,8 @@ export function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [session, setSession] = useState<AuthSession | null>(() => getAuthSession());
-  const [isBackendReady, setIsBackendReady] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
   const [summary, setSummary] = useState<SummaryData>({
     totalBalance: 0,
@@ -36,50 +37,28 @@ export function App() {
   });
   const [cashFlow, setCashFlow] = useState<CashFlowPoint[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [isLoadingData, setIsLoadingData] = useState(false);
 
   useEffect(() => {
     if (!session) {
       clearAuthSession();
+      setHasLoadedOnce(false);
       return;
     }
 
     localStorage.setItem('finance-tracker-auth', JSON.stringify(session));
   }, [session]);
 
+  // Silently pre-warm the backend on initial load without blocking the UI
   useEffect(() => {
-    let isMounted = true;
     const backendUrl = import.meta.env.VITE_API_URL?.replace(/\/$/, '');
+    if (!backendUrl) return;
 
-    if (!backendUrl) {
-      return;
-    }
-
-    const wakeBackendOnce = async () => {
-      try {
-        const response = await fetch(`${backendUrl}/api/health`, {
-          method: 'GET',
-          cache: 'no-store',
-        });
-
-        const text = await response.text();
-
-        if (!isMounted) return;
-
-        if (response.status === 200 && text.trim() === 'OK') {
-          setIsBackendReady(true);
-        }
-      } catch {
-        // Let the loader stay visible if the server is still starting.
-        // We intentionally avoid repeated pinging after the first wake-up request.
-      }
-    };
-
-    wakeBackendOnce();
-
-    return () => {
-      isMounted = false;
-    };
+    fetch(`${backendUrl}/api/health`, {
+      method: 'GET',
+      cache: 'no-store',
+    }).catch(() => {
+      // Background warm-up ping: silently ignore failures
+    });
   }, []);
 
   const renderLoadingCard = (title: string, subtitle: string) => (
@@ -117,6 +96,7 @@ export function App() {
       setSummary(sum);
       setCashFlow(flow);
       setTransactions(txs);
+      setHasLoadedOnce(true);
     } catch (err) {
       console.error('Failed to load data:', err);
     } finally {
@@ -147,15 +127,10 @@ export function App() {
   const handleLogout = () => {
     clearAuthSession();
     setSession(null);
+    setHasLoadedOnce(false);
   };
 
-  if (!isBackendReady) {
-    return renderLoadingCard(
-      'Secure database is waking up...',
-      'Please wait while the backend boots. Expect a 30-second delay.'
-    );
-  }
-
+  // If not authenticated, render login/signup screen immediately without delay
   if (!session) {
     return (
       <div
@@ -170,10 +145,11 @@ export function App() {
     );
   }
 
-  if (isLoadingData) {
+  // Only show the full-screen loader on initial cold load before any dashboard data has arrived
+  if (isLoadingData && !hasLoadedOnce) {
     return renderLoadingCard(
-      'Waking up database server...',
-      'Connecting to your finance data...'
+      'Loading your dashboard...',
+      'Preparing your financial overview...'
     );
   }
 
